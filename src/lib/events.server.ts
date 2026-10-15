@@ -146,7 +146,7 @@ export async function extractEvents(hits: SearchHit[], city: string, from: strin
   const parsed = JSON.parse(text || '{"events":[]}') as { events: ExtractedEvent[] };
   const urls = new Set(hits.map((h) => h.url));
   // Guard: only keep events whose source is one of the real search results
-  return parsed.events.filter((e) => e.title && (!e.source_url || urls.has(e.source_url)));
+  return parsed.events.filter((e) => e.title && e.source_url && urls.has(e.source_url));
 }
 
 export function dedupe<T extends { title: string; start_date: string | null; city: string | null }>(list: T[]): T[] {
