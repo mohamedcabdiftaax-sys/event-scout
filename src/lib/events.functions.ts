@@ -9,6 +9,9 @@ const searchInput = z.object({
   keyword: z.string().trim().max(120).optional().nullable(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+}).refine((data) => data.dateFrom <= data.dateTo, {
+  path: ["dateTo"],
+  message: "End date must be on or after start date",
 });
 
 export const runSearch = createServerFn({ method: "POST" })
