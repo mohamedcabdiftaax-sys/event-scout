@@ -16,7 +16,7 @@ export type ExtractedEvent = {
 const PLATFORMS = ["Facebook", "TikTok", "LinkedIn", "Twitter/X", "Eventbrite", "Other"];
 const CATEGORIES = ["Business", "Education", "Religious", "Music", "Sports", "Tech", "Community", "Other"];
 
-type SearchHit = { title: string; url: string; content: string; published_date?: string };
+type SearchHit = { title: string; url: string; content: string; published_date?: string | undefined };
 
 export async function webSearch(city: string, keyword: string | null, from: string, to: string) {
   const key = process.env["TAVILY_API_KEY"];
