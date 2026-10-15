@@ -14,7 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      events: {
+        Row: {
+          category: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          id: string
+          organizer: string | null
+          platform: string | null
+          purpose: string | null
+          search_id: string
+          source_url: string | null
+          start_date: string | null
+          summary: string | null
+          title: string
+          venue: string | null
+        }
+        Insert: {
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          organizer?: string | null
+          platform?: string | null
+          purpose?: string | null
+          search_id: string
+          source_url?: string | null
+          start_date?: string | null
+          summary?: string | null
+          title: string
+          venue?: string | null
+        }
+        Update: {
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          organizer?: string | null
+          platform?: string | null
+          purpose?: string | null
+          search_id?: string
+          source_url?: string | null
+          start_date?: string | null
+          summary?: string | null
+          title?: string
+          venue?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_search_id_fkey"
+            columns: ["search_id"]
+            isOneToOne: false
+            referencedRelation: "searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      searches: {
+        Row: {
+          category: string | null
+          city: string
+          created_at: string
+          date_from: string | null
+          date_to: string | null
+          email: string
+          email_sent: boolean
+          id: string
+          query: string | null
+          result_count: number
+        }
+        Insert: {
+          category?: string | null
+          city: string
+          created_at?: string
+          date_from?: string | null
+          date_to?: string | null
+          email: string
+          email_sent?: boolean
+          id?: string
+          query?: string | null
+          result_count?: number
+        }
+        Update: {
+          category?: string | null
+          city?: string
+          created_at?: string
+          date_from?: string | null
+          date_to?: string | null
+          email?: string
+          email_sent?: boolean
+          id?: string
+          query?: string | null
+          result_count?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
