@@ -45,7 +45,7 @@ function Index() {
     try {
       const r = await search({ data: { city, keyword: keyword || null, dateFrom: from, dateTo: to, email } });
       if (!r.ok) {
-        toast.error(r.error === "RATE_LIMIT" ? t.rateLimit : r.error === "SEARCH_NOT_CONFIGURED" ? t.notConfigured : t.error);
+        toast.error(r.error === "RATE_LIMIT" ? t.rateLimit : r.error === "SEARCH_NOT_CONFIGURED" ? t.notConfigured : r.error === "AI_CREDITS" ? t.noCredits : t.error);
         return;
       }
       saveEmail(email);
