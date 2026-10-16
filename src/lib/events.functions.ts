@@ -39,7 +39,7 @@ export const runSearch = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => searchInput.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { webSearch, extractEvents, dedupe, sendResultsEmail } = await import("./events.server");
+    const { webSearch, extractEvents, aiWebSearchEvents, dedupe, sendResultsEmail } = await import("./events.server");
     const email = data.email.toLowerCase();
 
     try {
@@ -55,8 +55,11 @@ export const runSearch = createServerFn({ method: "POST" })
         return { ok: false as const, error: "RATE_LIMIT" };
       }
 
-      const hits = await webSearch(data.city, data.keyword || null, data.dateFrom, data.dateTo);
-      const events = dedupe(await extractEvents(hits, data.city, data.dateFrom, data.dateTo));
+      const kw = data.keyword || null;
+      const raw = process.env["TAVILY_API_KEY"]
+        ? await extractEvents(await webSearch(data.city, kw, data.dateFrom, data.dateTo), data.city, data.dateFrom, data.dateTo)
+        : await aiWebSearchEvents(data.city, kw, data.dateFrom, data.dateTo);
+      const events = dedupe(raw);
 
       const { data: s, error } = await supabaseAdmin
         .from("searches")
