@@ -1,116 +1,76 @@
-# Event Scout
+# EventRadar
 
-Build a full-stack web app called "EventRadar" – a recent-events discovery tool.
+EventRadar is a full-stack event discovery tool. It searches the web for real upcoming events, extracts structured event data, saves the results, and can email the results to the searcher's address.
 
+## What is implemented
 
+- City/country, keyword/category, date range and email search form.
+- Searches general web results plus Facebook Events, TikTok, LinkedIn, X/Twitter, Eventbrite, Meetup and Instagram.
+- AI extraction with strict JSON output and a source-URL guard so invented events are discarded.
+- Deduplication by title + date + city.
+- Supabase persistence for searches and events.
+- Five searches per rolling 24-hour period per normalized email.
+- Results email through Resend, with Somali and English unsubscribe guidance.
+- Search History with city/platform/category/date filters, title/organizer search, and sorting.
+- Somali / English interface switch.
+- Server-side error handling so missing integrations fail with a controlled message instead of exposing secrets.
 
-CORE FLOW
+## Required server secrets
 
-1. Landing page with a search form: city/country (text), keyword/category (optional), date range (default: next 30 days), and an EMAIL field (required).
+The application cannot perform a real search or send a real email until these secrets are configured in the server environment:
 
-2. When the user submits, a Supabase Edge Function:
+```env
+TAVILY_API_KEY=...
+LOVABLE_API_KEY=...
+RESEND_API_KEY=...
+RESEND_FROM=EventRadar <onboarding@resend.dev>
+```
 
-   - Searches the web for recent/upcoming events using a search API (Tavily or Serper, key stored as a Supabase secret). Include queries targeting Facebook Events, TikTok, LinkedIn, Twitter/X, Eventbrite, Meetup, Instagram and general web.
+`TAVILY_API_KEY` powers web search. `LOVABLE_API_KEY` powers structured event extraction. `RESEND_API_KEY` powers email delivery. `RESEND_FROM` is optional; use a verified sender/domain for production. Do **not** put these secrets in frontend code.
 
-   - Sends the raw results to an LLM (Lovable AI / Anthropic API, key in secrets) that extracts structured data and returns ONLY JSON.
+See `.env.example` for the expected variable names. The real `.env` must remain local/server-side and must never contain production secrets in a public repository.
 
-3. Show results as cards AND save them in the database.
+## Supabase
 
-4. Automatically email the results to the user's email (use Resend via Edge Function) in a clean HTML email: title, date, city, organizer, purpose, source link.
+The app uses the server-side Supabase client for database operations. The expected data model is:
 
+- `searches`: search email, query, city, category, date range, result count, email status and creation time.
+- `events`: extracted event fields linked to a search by `search_id`.
 
-
-EXTRACTED FIELDS PER EVENT
-
-- title
-
-- purpose (why the event is happening / what it is about)
-
-- organizer (who is organizing)
-
-- city and country
-
-- venue
-
-- start date and time
-
-- platform (Facebook, TikTok, LinkedIn, Twitter/X, Eventbrite, Other)
-
-- source_url (direct link to the event)
-
-- short summary (2 sentences)
-
-- category (Business, Education, Religious, Music, Sports, Tech, Community, Other)
-
-
-
-SEARCH HISTORY SECTION
-
-- A "History" page listing every previous search (query, city, date, email, number of results), newest first.
-
-- Clicking a history item opens its saved results.
-
-- Filters on the history page: by city, platform, category, date; plus a text search on title/organizer.
-
-- Sort by date, city, or organizer.
-
-- Do not require login for MVP, but store history per email (user enters email to see their history). Add a simple email-based session.
-
-
-
-DATABASE (Supabase)
-
-- searches(id, email, query, city, category, date_from, date_to, created_at)
-
-- events(id, search_id, title, purpose, organizer, city, country, venue, start_date, platform, source_url, summary, category, created_at)
-
-- Enable RLS; restrict reads to rows matching the user's email.
-
-
-
-UI/UX
-
-- Mobile-first, clean, modern. Support Somali and English with a language toggle.
-
-- Loading state while searching, empty state, and error toasts.
-
-- Show "Email sent" confirmation after the search completes.
-
-- Deduplicate events by title + date + city.
-
-
-
-RULES
-
-- Never invent events: only return events found in search results; if a field is missing, set it to null.
-
-- Never expose API keys in the frontend; all API calls go through Edge Functions.
-
-- Add rate limiting (max 5 searches per email per day).
-
-- Include an unsubscribe note in emails.
-
-
-
-Start with the database schema and the Edge Function, then build the UI.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/bdd8094d-fc37-4c40-a604-5136371f8494).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+The service-role key is server-only. Database policies should still be configured in Supabase for any client-accessible tables or APIs.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
 ```sh
 git clone <this-repository-url>
-cd <repository-name>
-npm i
+cd event-scout
+npm install
 npm run dev
 ```
+
+Available checks:
+
+```sh
+npm run lint
+npm test
+npm run build
+```
+
+## Testing checklist
+
+Before calling a deployment production-ready:
+
+1. Configure Tavily, Lovable AI and Resend secrets.
+2. Run a real search for a small city/date range.
+3. Confirm only source-backed events appear.
+4. Confirm the search and events are saved in Supabase.
+5. Confirm the result email arrives.
+6. Confirm History loads the saved search and events.
+7. Test the five-search limit.
+8. Test an invalid date range and missing/invalid email.
+9. Test both English and Somali UI.
+10. Verify that no API secret is exposed in browser/network responses.
+
+## Privacy limitation of the MVP
+
+History is currently looked up by email address. That means knowing another person's email can reveal their stored searches. This is acceptable only as an MVP trade-off; production should add email verification or authentication before treating History as private data.
