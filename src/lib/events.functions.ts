@@ -14,6 +14,27 @@ const searchInput = z.object({
   message: "End date must be on or after start date",
 });
 
+const KNOWN_ERRORS = [
+  "RATE_LIMIT",
+  "SEARCH_NOT_CONFIGURED",
+  "SEARCH_FAILED",
+  "AI_NOT_CONFIGURED",
+  "AI_CREDITS",
+  "AI_RATE_LIMIT",
+  "AI_FAILED",
+  "DATABASE_ERROR",
+] as const;
+
+type SearchError = (typeof KNOWN_ERRORS)[number] | "FAILED";
+
+function toSearchError(error: unknown): SearchError {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = KNOWN_ERRORS.find((code) => message.startsWith(code));
+  if (match) return match;
+  if (message.includes("Missing Supabase environment variable")) return "DATABASE_ERROR";
+  return "FAILED";
+}
+
 export const runSearch = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => searchInput.parse(d))
   .handler(async ({ data }) => {
@@ -29,7 +50,7 @@ export const runSearch = createServerFn({ method: "POST" })
         .eq("email", email)
         .gte("created_at", since);
 
-      if (countError) throw countError;
+      if (countError) throw new Error("DATABASE_ERROR");
       if ((count ?? 0) >= DAILY_LIMIT) {
         return { ok: false as const, error: "RATE_LIMIT" };
       }
@@ -51,7 +72,7 @@ export const runSearch = createServerFn({ method: "POST" })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) throw new Error("DATABASE_ERROR");
 
       let saved: any[] = [];
       if (events.length) {
@@ -65,7 +86,7 @@ export const runSearch = createServerFn({ method: "POST" })
         });
 
         const ins = await supabaseAdmin.from("events").insert(rows).select();
-        if (ins.error) throw ins.error;
+        if (ins.error) throw new Error("DATABASE_ERROR");
         saved = ins.data;
       }
 
@@ -80,8 +101,9 @@ export const runSearch = createServerFn({ method: "POST" })
 
       return { ok: true as const, searchId: s.id, events: saved, emailSent };
     } catch (e) {
-      console.error("Event search failed:", e);
-      return { ok: false as const, error: "FAILED" };
+      const error = toSearchError(e);
+      console.error("Event search failed:", error, e);
+      return { ok: false as const, error };
     }
   });
 
