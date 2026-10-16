@@ -246,5 +246,8 @@ RULES:
   }
   let parsed: { events: ExtractedEvent[] } = { events: [] };
   try { parsed = JSON.parse(text || '{"events":[]}'); } catch { throw new Error("AI_FAILED bad json"); }
-  return parsed.events.filter((e) => e.title && e.source_url && /^https?:\/\//.test(e.source_url));
+  const clean = (v: string | null) => (v ? v.replace(/\s*\(\[[^\]]*\]\([^)]*\)\)/g, "").trim() || null : v);
+  return parsed.events
+    .filter((e) => e.title && e.source_url && /^https?:\/\//.test(e.source_url))
+    .map((e) => ({ ...e, summary: clean(e.summary), purpose: clean(e.purpose), source_url: e.source_url!.replace(/[?&]utm_source=openai/, "") }));
 }
