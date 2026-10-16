@@ -190,3 +190,61 @@ ${e.source_url ? `<a href="${esc(e.source_url)}" style="display:inline-block;mar
   if (!r.ok) console.error("resend", r.status, await r.text());
   return r.ok;
 }
+
+// Fallback when no search API key is set: the built-in AI searches the web itself.
+export async function aiWebSearchEvents(city: string, keyword: string | null, from: string, to: string): Promise<ExtractedEvent[]> {
+  const apiKey = process.env["LOVABLE_API_KEY"];
+  if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
+  const k = keyword ? ` related to "${keyword}"` : "";
+  const instructions = `Search the web for real events${k} in or near "${city}" between ${from} and ${to}. Look at Facebook Events, Eventbrite, Meetup, LinkedIn, X/Twitter, TikTok, Instagram and local websites.
+RULES:
+- Only include events you actually found in search results. NEVER invent events or details.
+- If a field is unknown, set it to null.
+- source_url must be the exact page URL where you found the event.
+- platform: Facebook, TikTok, LinkedIn, Twitter/X, Eventbrite or Other.
+- summary: max 2 sentences. purpose: what the event is about. Return up to 15 events.`;
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "fetch" },
+    body: JSON.stringify({
+      model: "openai/gpt-6-astra",
+      instructions,
+      input: `Find events in ${city} from ${from} to ${to}${k}.`,
+      tools: [{ type: "web_search" }],
+      stream: true,
+      store: false,
+      reasoning: { effort: "low", summary: "auto" },
+      include: ["reasoning.encrypted_content"],
+      text: { format: { type: "json_schema", name: "events", strict: true, schema } },
+    }),
+  });
+  if (!res.ok || !res.body) {
+    const t = await res.text().catch(() => "");
+    if (res.status === 402) throw new Error("AI_CREDITS");
+    if (res.status === 429) throw new Error("AI_RATE_LIMIT");
+    throw new Error(`AI_FAILED ${res.status} ${t.slice(0, 200)}`);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const d = line.slice(5).trim();
+      if (!d || d === "[DONE]") continue;
+      let ev: any;
+      try { ev = JSON.parse(d); } catch { continue; }
+      if (ev.type === "response.output_text.delta") text += ev.delta;
+      if (ev.type === "error" || ev.type === "response.failed") throw new Error("AI_FAILED");
+    }
+  }
+  let parsed: { events: ExtractedEvent[] } = { events: [] };
+  try { parsed = JSON.parse(text || '{"events":[]}'); } catch { throw new Error("AI_FAILED bad json"); }
+  return parsed.events.filter((e) => e.title && e.source_url && /^https?:\/\//.test(e.source_url));
+}
